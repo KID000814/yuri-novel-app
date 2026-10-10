@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>✨ 百合小说分享站 ✨</title>
+  <link rel="stylesheet" href="/style.css?v=9" />
+</head>
+<body>
+  <canvas id="sparkles"></canvas>
+  <div class="page">
+    <!-- 顶部 -->
+    <header class="hero">
+      <div class="hero-stars">☆ ★ ✦ ☆</div>
+      <h1 class="title">百 合 小 说 分 享 站</h1>
+      <p class="tagline" id="site-tagline">Yuri小说 · 儿童病例的神秘网站 · GL小说</p>
+      <div class="hero-stars">✦ ☆ ★ ✦</div>
+    </header>
+
+    <!-- 登录状态导航 -->
+    <div class="auth-nav">
+      <div id="guest-nav" class="auth-guest">
+        <button class="btn small y2k" id="open-auth">🔑 登录 / 注册</button>
+        <span class="auth-hint">登录后才能上传文件</span>
+      </div>
+      <div id="user-nav" class="auth-user hidden">
+        <img id="nav-avatar" class="nav-avatar" alt="" />
+        <span id="nav-username" class="nav-name"></span>
+        <button class="btn small" id="btn-my-profile">👤 我的主页</button>
+        <button class="btn small ghost" id="btn-logout">退出</button>
+      </div>
+    </div>
+
+    <!-- 作者密钥 -->
+    <div class="panel author-bar">
+      <div class="author-key-row">
+        <span class="label">👑 作者密钥</span>
+        <input type="password" id="adminKey" placeholder="填写密钥 → 上传进入作者区" autocomplete="off" />
+        <span class="hint" id="hint">未填写 = 进入「大家的上传」</span>
+      </div>
+    </div>
+
+    <!-- 上传 -->
+    <section class="panel">
+      <h2 class="sec-title">📤 上传文件 <small id="upload-hint"></small></h2>
+      <div id="dropzone" class="dropzone">
+        <div class="dz-emoji">💾</div>
+        <p><strong>拖拽或点击上传</strong></p>
+        <p class="dz-hint">仅支持 <span class="badge">txt</span> <span class="badge">epub</span> <span class="badge">docx</span> · 可多选</p>
+        <input type="file" id="file-input" accept=".txt,.epub,.docx" multiple hidden />
+      </div>
+      <div class="upload-opts">
+        <label class="cat-label">👤 显示名
+          <input type="text" id="sharerName" placeholder="默认用你的用户名" maxlength="40" autocomplete="off" />
+        </label>
+        <label class="cat-label">🗂 选个分类
+          <select id="uploadCat"><option value="">（未分类）</option></select>
+        </label>
+      </div>
+      <p class="up-note">公开作品信息：点开文件即可自定义封面、填写作品简介等。</p>
+      <div id="upload-progress" class="progress-wrap hidden">
+        <div class="progress-bar"><div id="progress-fill"></div></div>
+        <span id="progress-text">0%</span>
+      </div>
+      <ul id="upload-results" class="feed"></ul>
+      <p id="upload-error" class="error hidden"></p>
+    </section>
+
+    <!-- 分类面板 -->
+    <section class="panel">
+      <h2 class="sec-title">🗂 自定义分类 <small>（作者可新增/重命名/删除）</small></h2>
+      <div class="cat-add">
+        <input type="text" id="newCat" placeholder="新增顶级分类…" />
+        <button id="addCat" class="btn y2k">＋ 添加</button>
+      </div>
+      <ul id="catTree" class="cat-tree"></ul>
+    </section>
+
+    <!-- 检索 / 浏览 -->
+    <section class="panel">
+      <h2 class="sec-title">🔍 检索 &amp; 浏览</h2>
+      <div id="browse-controls">
+        <div class="search-row">
+          <input type="text" id="search-input" placeholder="输入文件名或正文关键词…" autocomplete="off" />
+          <button id="clear-search" class="btn ghost hidden">清除</button>
+        </div>
+        <div class="layout-row">
+          <span class="label">排版</span>
+          <button class="layout-btn" data-cols="1">▤ 单列</button>
+          <button class="layout-btn" data-cols="2">▦ 两列</button>
+          <button class="layout-btn" data-cols="3">▨ 三列</button>
+        </div>
+        <div class="tabs" id="ownerTabs">
+          <button class="tab active" data-owner="">全部</button>
+          <button class="tab" data-owner="author">👑 作者区</button>
+          <button class="tab" data-owner="visitor">💬 大家的上传</button>
+          <button class="tab" id="tab-my" data-owner="me">👤 我的主页</button>
+        </div>
+        <div class="cat-chips" id="catChips"></div>
+      </div>
+
+      <!-- 个人主页视图 -->
+      <div id="profile-view" class="profile-view hidden">
+        <button class="btn small ghost" id="profile-back">← 返回列表</button>
+        <div class="profile-head">
+          <img id="profile-avatar" class="profile-avatar" alt="" />
+          <div class="profile-meta">
+            <h3 id="profile-name"></h3>
+            <p id="profile-count" class="profile-count"></p>
+            <button class="btn small" id="btn-change-avatar">🖼 更换头像</button>
+            <input type="file" id="avatar-input" accept=".jpg,.jpeg,.png,.gif,.webp" hidden />
+          </div>
+        </div>
+        <div id="profile-files" class="file-list"></div>
+      </div>
+
+      <div id="file-list" class="file-list"></div>
+    </section>
+  </div>
+
+  <footer class="foot">✨ y2k 百合小说分享站 ✨ 仅 txt / epub / docx</footer>
+
+  <!-- 作品详情弹窗 -->
+  <div id="detail-modal" class="modal hidden">
+    <div class="modal-box detail-box">
+      <button class="modal-close" id="detail-close">✕</button>
+      <div class="detail-layout">
+        <div class="detail-cover-col">
+          <img id="detail-cover" class="detail-cover" alt="封面" />
+          <button class="btn small ghost" id="btn-change-cover">🖼 更换封面</button>
+          <button class="btn small ghost danger-outline" id="btn-remove-cover">🗑 删除封面</button>
+          <input type="file" id="cover-input" accept=".jpg,.jpeg,.png,.gif,.webp" hidden />
+        </div>
+        <div class="detail-info-col">
+          <h2 id="detail-title" class="detail-title"></h2>
+          <div id="detail-uploader" class="detail-uploader"></div>
+          <div id="detail-meta" class="detail-meta"></div>
+          <div id="detail-tags" class="detail-tags"></div>
+          <p id="detail-summary" class="detail-summary"></p>
+          <div class="detail-actions">
+            <a id="detail-download" class="btn y2k" href="#" download>⬇ 下载</a>
+            <button class="btn small ghost" id="btn-edit-meta">✏️ 编辑信息</button>
+            <button class="btn small danger" id="btn-delete-file">🗑 删除</button>
+          </div>
+        </div>
+      </div>
+      <div id="edit-form" class="edit-form hidden">
+        <label>书名 <input id="fm-title" maxlength="80" /></label>
+        <label>作者 <input id="fm-author" maxlength="40" /></label>
+        <label>译者 <input id="fm-translator" maxlength="40" /></label>
+        <label>状态 <select id="fm-status"><option value="">未知</option><option>连载</option><option>完结</option></select></label>
+        <label>字数 <input id="fm-words" type="number" min="0" /></label>
+        <label>标签 <input id="fm-tags" placeholder="逗号分隔" maxlength="120" /></label>
+        <label>重新分类
+          <select id="fm-cat"><option value="">（未分类）</option></select>
+        </label>
+        <label class="full">作品简介
+          <textarea id="fm-summary" rows="4" maxlength="2000"></textarea>
+        </label>
+        <div class="edit-actions">
+          <button class="btn y2k" id="btn-save-meta">保存</button>
+          <button class="btn small ghost" id="btn-cancel-meta">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 登录/注册弹窗 -->
+  <div id="auth-modal" class="modal hidden">
+    <div class="modal-box">
+      <button class="modal-close" id="auth-close">✕</button>
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tab-login">登录</button>
+        <button class="auth-tab" id="tab-register">注册</button>
+      </div>
+      <input type="text" id="auth-username" placeholder="用户名" autocomplete="username" maxlength="24" />
+      <input type="password" id="auth-password" placeholder="密码（至少 6 位）" autocomplete="current-password" />
+      <button class="btn y2k full" id="auth-submit">登录</button>
+      <p id="auth-error" class="error hidden"></p>
+    </div>
+  </div>
+
+  <script src="/app.js?v=9"></script>
+</body>
+</html>
