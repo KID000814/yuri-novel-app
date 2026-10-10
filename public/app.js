@@ -211,8 +211,19 @@ async function uploadFiles(files) {
       xhr.send(fd);
     });
     wrap.classList.add('hidden');
-    if (data.ok) { results.innerHTML = data.files.map((f) => `<li class="ok">已上传：${esc(f.name)}</li>`).join(''); refreshDisplay(); }
-    else if (data.error) { errEl.textContent = data.error; errEl.classList.remove('hidden'); }
+    if (data.ok) {
+      let html = (data.files || []).map((f) => `<li class="ok">已上传：${esc(f.name)}</li>`).join('');
+      if (data.skipped && data.skipped.length) {
+        html += data.skipped.map((s) => `<li class="skip">已跳过：${esc(s.name)} —— ${esc(s.reason)}</li>`).join('');
+      }
+      results.innerHTML = html;
+      refreshDisplay();
+    } else if (data.error) {
+      const msg = (data.skipped && data.skipped.length)
+        ? data.skipped.map((s) => `${s.name}：${s.reason}`).join('；')
+        : data.error;
+      errEl.textContent = msg; errEl.classList.remove('hidden');
+    }
   } catch (e) { wrap.classList.add('hidden'); errEl.textContent = '上传失败：' + (e.message || e); errEl.classList.remove('hidden'); }
   finally { fileInput.value = ''; }
 }
