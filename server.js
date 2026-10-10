@@ -283,7 +283,9 @@ function fileFilter(_req, file, cb) {
   if (ALLOWED_EXTS.has(ext)) cb(null, true);
   else cb(new Error(`不支持的文件类型 .${ext}，仅允许 txt / epub / docx`));
 }
-const upload = multer({ storage: multerStorage, fileFilter, limits: { fileSize: MAX_FILE_SIZE } });
+// 注意: 这里不挂 fileFilter。批量上传时若个别文件类型不符，
+// 不应让整批失败，而是在下面的处理循环里逐个跳过并提示。
+const upload = multer({ storage: multerStorage, limits: { fileSize: MAX_FILE_SIZE, files: 100 } });
 
 const avatarStorage = multer.diskStorage({ destination: (_req, _file, cb) => cb(null, TMP_DIR), filename: (_req, _file, cb) => cb(null, `${uid()}-avatar`) });
 function avatarFilter(_req, file, cb) {
@@ -435,7 +437,10 @@ app.delete('/api/categories/:id', async (req, res) => {
  * ============================================================ */
 app.post('/api/upload', auth, (req, res) => {
   upload.array('files', 100)(req, res, async (err) => {
-    if (err) return res.status(400).json({ ok: false, error: err.message || '上传失败' });
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE' ? `单个文件超过大小上限（${Math.round(MAX_FILE_SIZE / 1048576)}MB）` : (err.message || '上传失败');
+      return res.status(400).json({ ok: false, error: msg });
+    }
     const authorKey = String(req.body.authorKey || '');
     const categoryId = req.body.categoryId ? String(req.body.categoryId) : null;
     const sharerName = String(req.body.sharerName || '').trim().slice(0, 40) || req.user.username;
@@ -443,33 +448,47 @@ app.post('/api/upload', auth, (req, res) => {
     if (categoryId && !catById(categoryId)) return res.status(400).json({ ok: false, error: '分类不存在' });
 
     const uploaded = [];
+    const skipped = [];   // 被跳过的文件(类型不符/出错),不拖垮整批
     for (const f of req.files || []) {
       const originalName = Buffer.from(f.originalname || '', 'latin1').toString('utf8') || f.filename;
-      const id = path.basename(f.filename, path.extname(f.filename));
       const ext = getExt(originalName);
-      const blob = fs.readFileSync(f.path);
-      const text = await extractText(f.path, ext);
-      const rec = {
-        id, name: originalName, stored: f.filename, size: f.size,
-        mime: f.mimetype || 'application/octet-stream', ext,
-        uploadedAt: new Date().toISOString(),
-        owner, categoryId, sharerName: sharerName || null, userId: req.user.id,
-        title: cleanStr(req.body.title, 80) || originalName,
-        author: cleanStr(req.body.author, 40),
-        translator: cleanStr(req.body.translator, 40),
-        status: cleanStr(req.body.status, 10),
-        words: parseWords(req.body.words),
-        tags: cleanTags(req.body.tags),
-        summary: cleanSummary(req.body.summary)
-      };
-      await storage.put(fileKey(f.filename), blob);
-      await storage.put(textKey(id), Buffer.from(text || ''));
-      await saveMeta(rec);
-      metadata.push(rec); uploaded.push(rec);
-      textCache.delete(id);
-      try { fs.unlinkSync(f.path); } catch (_) {}
+      // 单个文件类型不符: 只跳过它
+      if (!ALLOWED_EXTS.has(ext)) {
+        skipped.push({ name: originalName, reason: `不支持的格式 .${ext}（仅支持 txt / epub / docx）` });
+        continue;
+      }
+      try {
+        const id = path.basename(f.filename, path.extname(f.filename));
+        const blob = fs.readFileSync(f.path);
+        const text = await extractText(f.path, ext);
+        const rec = {
+          id, name: originalName, stored: f.filename, size: f.size,
+          mime: f.mimetype || 'application/octet-stream', ext,
+          uploadedAt: new Date().toISOString(),
+          owner, categoryId, sharerName: sharerName || null, userId: req.user.id,
+          title: cleanStr(req.body.title, 80) || originalName,
+          author: cleanStr(req.body.author, 40),
+          translator: cleanStr(req.body.translator, 40),
+          status: cleanStr(req.body.status, 10),
+          words: parseWords(req.body.words),
+          tags: cleanTags(req.body.tags),
+          summary: cleanSummary(req.body.summary)
+        };
+        await storage.put(fileKey(f.filename), blob);
+        await storage.put(textKey(id), Buffer.from(text || ''));
+        await saveMeta(rec);
+        metadata.push(rec); uploaded.push(rec);
+        textCache.delete(id);
+      } catch (e) {
+        skipped.push({ name: originalName, reason: '处理失败：' + (e.message || e) });
+      } finally {
+        try { fs.unlinkSync(f.path); } catch (_) {}
+      }
     }
-    res.json({ ok: true, uploaded: uploaded.length, files: uploaded.map((f) => visible(f, req)) });
+    if (!uploaded.length && skipped.length) {
+      return res.status(400).json({ ok: false, error: skipped.map((s) => `${s.name}：${s.reason}`).join('；'), skipped });
+    }
+    res.json({ ok: true, uploaded: uploaded.length, skipped, files: uploaded.map((f) => visible(f, req)) });
   });
 });
 
