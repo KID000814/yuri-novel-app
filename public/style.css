@@ -234,3 +234,7 @@ body {
 .edit-form textarea { resize: vertical; }
 .edit-form :is(input, select, textarea):focus { border-color: var(--purple); box-shadow: 0 0 0 4px var(--glow); }
 .edit-actions { grid-column: 1 / -1; display: flex; gap: 10px; }
+
+/* 批量上传: 被跳过的文件提示 */
+#upload-results li.skip { color: #b45309; background: #fff7ed; border: 1px solid #fed7aa; }
+#upload-results li.ok { color: #15803d; background: #f0fdf4; border: 1px solid #bbf7d0; }
